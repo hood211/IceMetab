@@ -1,0 +1,512 @@
+s(Qres) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel2s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+# Doy only with stream as temp or category
+g.er.modsel3t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel3s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500, class = "gamm"))
+g.er.Dredge_1t <-  dredge(global.model = g.er.modsel1t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_1s <-  dredge(global.model = g.er.modsel1s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2t <-  dredge(global.model = g.er.modsel2t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2s <-  dredge(global.model = g.er.modsel2s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3t <-  dredge(global.model = g.er.modsel3t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3s <-  dredge(global.model = g.er.modsel3s, evaluate = TRUE, rank = AIC)
+# Chunk 10
+g.erDredgeSum1 <- merge(g.er.Dredge_1t, g.er.Dredge_1s)
+g.erDredgeSum2 <- merge(g.er.Dredge_2t, g.er.Dredge_2s)
+g.erDredgeSum3 <- merge(g.er.Dredge_3t, g.er.Dredge_3s)
+g.erDredgeSumF0 <- merge(g.erDredgeSum1, g.erDredgeSum2)
+g.erDredgeSumF <- merge(g.erDredgeSumF0, g.erDredgeSum3)
+g.er.modsel3s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.Dredge_3s <-  dredge(global.model = g.er.modsel3s, evaluate = TRUE, rank = AIC)
+g.er.modsel3s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel3s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+g.er.Dredge_3s <-  dredge(global.model = g.er.modsel3s, evaluate = TRUE, rank = AIC)
+g.erDredgeSum1 <- merge(g.er.Dredge_1t, g.er.Dredge_1s)
+g.erDredgeSum2 <- merge(g.er.Dredge_2t, g.er.Dredge_2s)
+g.erDredgeSum3 <- merge(g.er.Dredge_3t, g.er.Dredge_3s)
+g.erDredgeSumF0 <- merge(g.erDredgeSum1, g.erDredgeSum2)
+g.erDredgeSumF <- merge(g.erDredgeSumF0, g.erDredgeSum3)
+subset(g.erDredgeSumF, delta <= 2)
+g.er.BEST1 <-   gamm(lER ~ stream*Tanom.iktCs + treatment*Tanom.iktCs + stream*treatment +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation =BestERCor, REML = TRUE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+summary(g.er.BEST1$gam)
+save.image(file.path(here::here("04_SavedImages"), "05_ERanalysesNonly_rdat"))
+# Chunk 1: setup
+knitr::opts_chunk$set(echo = TRUE)
+# Chunk 2
+library(tidyverse)
+library(here)
+library(mgcViz)
+library(MuMIn)
+library(mgcv)
+library(forecast)
+library(gridExtra)
+library(tidymv)
+library(ggpubr)
+# Chunk 3
+load(file.path(here::here("04_SavedImages"), "02_ERanalyses_rdat"))
+# Chunk 4
+met <- readr::read_csv(file = file.path(here::here("01_Data"),"01_MundgedMetabDat.csv")) %>%
+mutate(stream = fct_relevel(stream, c("st11U", "st18", "st6", "st9")),
+treatment = fct_relevel(treatment, c("ambient", "nitrogen", "phosphorus")),
+Yf = as.factor(Yf),
+streamTreat = as.factor(streamTreat),
+ppdoy180 = ifelse(doy <180,"l180", "g180"))%>%
+# cutting it off here removes most of the weird, low ER values
+# filter(doy >=183) %>%
+group_by(streamTreat) %>%
+dplyr::mutate(DD = cumsum(meanTemp)) %>%
+ungroup() %>%
+droplevels()
+# Chunk 5
+ggplot(met, aes(y = lER, x = doy, color = treatment, shape = ppdoy180)) +
+geom_point()+
+stat_smooth() +
+facet_wrap(vars(stream))
+# Chunk 6
+ggplot(met, aes(y = meanQds, x = doy, color = treatment, shape = ppdoy180)) +
+geom_point()+
+stat_smooth() +
+facet_wrap(vars(stream))
+# Chunk 7
+ggplot(met, aes(sample = lER)) +stat_qq() + stat_qq_line()
+# Chunk 8
+ggplot(met, aes(sample = lER, color = stream)) +stat_qq() + stat_qq_line() +
+facet_grid(.~stream)
+# Chunk 9
+# numerous models were evaluated in earlier versions
+g.er.global <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8))
+# Chunk 10
+summary(g.er.global$gam)
+# Chunk 11
+g.er.global.gv <- getViz(g.er.global$gam)
+print(plot(g.er.global.gv, allTerms = T), pages =1)
+# Chunk 12
+check.gamViz(g.er.global.gv)
+# Chunk 13
+# https://www.kaggle.com/timib1203/managing-many-models-with-tidyr-purrr-and-broom
+# https://jroy042.github.io/nonlinear/week4.html
+# https://stackoverflow.com/questions/47586110/autocorrelation-in-generalized-additive-models-gam
+g.er.global.acf <- met %>%
+mutate(g.erRes = resid(g.er.global$lme, type = "normalized")) %>%
+select(streamTreat, g.erRes) %>%
+group_by(streamTreat) %>%
+nest() %>%
+mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.erRes) + labs(title = streamTreat)))
+# Chunk 14
+grid.arrange(grobs = g.er.global.acf$acf, ncol = 3)
+# Chunk 15
+round(concurvity(g.er.global$gam, full = FALSE)$estimate,3)
+g.er.AC_1.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 1,q = 0, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+g.er.AC_1.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 1,q = 1, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+g.er.AC_1.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 1,q = 2, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+g.er.AC_2.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 2,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_2.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 2,q = 1, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+g.er.AC_2.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 2,q = 2, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+g.er.AC_3.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 3,q = 0, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+g.er.AC_3.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 3,q = 1, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+g.er.AC_3.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 3,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_3.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 3,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_3.4 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 3,q = 4, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_4.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 4,q =0, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_4.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 4,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_4.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 4,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_4.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 4,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_4.4 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 4,q = 4, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_5.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 5,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_6.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 6,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+g.er.AC_1.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 1,q = 1, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), REML = FALSE, data = met)
+g.er.AC_2.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 2,q = 2, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), REML = FALSE, data = met)
+#
+g.er.AC_3.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 3,q = 0, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), REML = FALSE, data = met)
+g.er.AC_3.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 3,q = 1, form = ~ doy | streamTreat),
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), REML = FALSE, data = met)
+g.er.AC_4.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 4,q =0, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+g.er.AC_5.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = corARMA(p = 5,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+model.sel(g.er.AC_1.0$lme,
+#g.er.AC_1.1$lme,
+g.er.AC_1.2$lme,
+g.er.AC_2.0$lme,
+g.er.AC_2.1$lme,
+g.er.AC_2.2$lme,
+#g.er.AC_3.0$lme,
+g.er.AC_3.1$lme,
+g.er.AC_3.2$lme,
+g.er.AC_3.3$lme,
+g.er.AC_3.4$lme,
+#g.er.AC_4.0$lme,
+g.er.AC_4.1$lme, g.er.AC_4.2$lme, g.er.AC_4.3$lme, g.er.AC_4.4$lme,
+#g.er.AC_5.3$lme,
+g.er.AC_6.3$lme)
+# https://www.kaggle.com/timib1203/managing-many-models-with-tidyr-purrr-and-broom
+# https://jroy042.github.io/nonlinear/week4.html
+# https://stackoverflow.com/questions/47586110/autocorrelation-in-generalized-additive-models-gam
+g.er.AC_best.acf <- met %>%
+mutate(g.erRes = resid(g.er.AC_3.2$lme, type = "normalized")) %>%
+select(streamTreat, g.erRes) %>%
+group_by(streamTreat) %>%
+nest() %>%
+mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.erRes) + labs(title = streamTreat)))
+grid.arrange(grobs = g.er.AC_best.acf$acf, ncol = 3)
+# https://www.kaggle.com/timib1203/managing-many-models-with-tidyr-purrr-and-broom
+# https://jroy042.github.io/nonlinear/week4.html
+# https://stackoverflow.com/questions/47586110/autocorrelation-in-generalized-additive-models-gam
+g.er.AC_best.acf <- met %>%
+mutate(g.erRes = resid(g.er.AC_4.2$lme, type = "normalized")) %>%
+select(streamTreat, g.erRes) %>%
+group_by(streamTreat) %>%
+nest() %>%
+mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.erRes) + labs(title = streamTreat)))
+grid.arrange(grobs = g.er.AC_best.acf$acf, ncol = 3)
+# https://www.kaggle.com/timib1203/managing-many-models-with-tidyr-purrr-and-broom
+# https://jroy042.github.io/nonlinear/week4.html
+# https://stackoverflow.com/questions/47586110/autocorrelation-in-generalized-additive-models-gam
+g.er.AC_best.acf <- met %>%
+mutate(g.erRes = resid(g.er.AC_3.4$lme, type = "normalized")) %>%
+select(streamTreat, g.erRes) %>%
+group_by(streamTreat) %>%
+nest() %>%
+mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.erRes) + labs(title = streamTreat)))
+grid.arrange(grobs = g.er.AC_best.acf$acf, ncol = 3)
+BestERCor <- corARMA(p = 3,q = 2, form = ~ doy | streamTreat)
+# full with stream as temp or category
+g.er.modsel1t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel1s <-  uGamm(lER ~ treatment * stream  * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+# Qres only with stream as temp or category
+g.er.modsel2t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel2s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+# Doy only with stream as temp or category
+g.er.modsel3t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel3s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+g.er.Dredge_1t <-  dredge(global.model = g.er.modsel1t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_1s <-  dredge(global.model = g.er.modsel1s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2t <-  dredge(global.model = g.er.modsel2t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2s <-  dredge(global.model = g.er.modsel2s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3t <-  dredge(global.model = g.er.modsel3t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3s <-  dredge(global.model = g.er.modsel3s, evaluate = TRUE, rank = AIC)
+g.erDredgeSum1 <- merge(g.er.Dredge_1t, g.er.Dredge_1s)
+g.erDredgeSum2 <- merge(g.er.Dredge_2t, g.er.Dredge_2s)
+g.erDredgeSum3 <- merge(g.er.Dredge_3t, g.er.Dredge_3s)
+g.erDredgeSumF0 <- merge(g.erDredgeSum1, g.erDredgeSum2)
+g.erDredgeSumF <- merge(g.erDredgeSumF0, g.erDredgeSum3)
+subset(g.erDredgeSumF, delta <= 2)
+save.image(file.path(here::here("04_SavedImages"), "02_ERanalyses_rdat"))
+subset(g.erDredgeSumF, delta <= 10)
+subset(g.erDredgeSumF, delta <= 2)
+View(g.erDredgeSumF)
+summary(g.er.BEST1)
+summary(g.er.BEST1$gam)
+g.er.BEST1 <- gamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+g.er.BEST2 <- gamm(lER ~ treatment * stream + treatment * Tanom.iktCs + stream * Tanom.iktCs  +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+summary(g.er.BEST1$gam)
+save.image(file.path(here::here("04_SavedImages"), "02_ERanalyses_rdat"))
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(here)
+library(MuMIn)
+met3 <- readr::read_csv(file = file.path(here::here("01_Data"),"00_metab_for_Hoodie.csv"))
+met2 <- met3 %>%
+mutate(Pdt = as.POSIXct(Pdt, format = "%m/%d/%y"),
+doy = as.numeric(strftime(Pdt, format = "%j")),
+Y = as.numeric(strftime(Pdt, format = "%Y")),
+Yf = as.factor(as.character(Y)),
+lGPP = log(GPP_median),
+lER = log(-ER_median),
+#centering
+invKT.C = one_over_kT - 1/((10 + 273.15)*0.0000862),
+streamTreat = as.factor(paste0(stream,"_",treatment))) %>%
+mutate_at(vars(stream, treatment), funs(as.factor(.))) %>%
+rename(invKT = one_over_kT)
+# stream mean
+metS <- met2 %>%
+group_by(stream, treatment) %>%
+summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE))) %>%
+group_by(stream) %>%
+summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE))) %>%
+rename_at(vars(-stream), function(x) paste0(x,".StMean"))
+# global mean
+metG0 <- met2 %>%
+group_by(stream, treatment) %>%
+summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE))) %>%
+group_by(stream) %>%
+summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE))) %>%
+group_by() %>%
+summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE)))%>%
+rename_at(vars(meanTemp:lGPP), function(x) paste0(x,".GMean"))
+metG <- rbind(metG0, metG0, metG0, metG0)
+metG$stream <- c("st11U", "st18", "st6", "st9")
+met <- met2 %>%
+full_join(metS, by = "stream") %>%
+full_join(metG, by = "stream") %>%
+#these are centered on the stream mean
+mutate(Tanom.iktCs = invKT.C - invKT.C.StMean, #stream mean
+Tanom.iktCg = invKT.C - invKT.C.GMean,  #global mean
+Tanom.Cs = meanTemp - meanTemp.StMean,
+Tanom.Cg = meanTemp - meanTemp.GMean,
+LightPerDayCs = LightPerDay - LightPerDay.StMean,
+LightPerDayCg = LightPerDay - LightPerDay.GMean,
+meanQdsCs = meanQds - meanQds.StMean,
+meanQdsCg = meanQds - meanQds.GMean,
+LightPerDay.l = log(LightPerDay),
+meanQds.l = log(meanQds),
+LightPerDay.lcs = LightPerDay.l - log(LightPerDay.StMean),
+LightPerDay.lcg = LightPerDay.l - log(LightPerDay.GMean),
+meanQds.lcs = meanQds.l - log(meanQds.StMean),
+meanQds.lcg = meanQds.l - log(meanQds.GMean),
+lGPP.cs = lGPP - lGPP.StMean,
+lGPP.cg = lGPP - lGPP.GMean,
+streamTreat = paste0(stream," ", treatment),
+stream = as.factor(stream))
+ggplot(met, aes(y = LightPerDay.lcs, x = doy, color = Yf)) +
+geom_line() +
+facet_grid(. ~ stream)
+ggplot(met, aes(sample = LightPerDay.lcg, color = stream)) +stat_qq() + stat_qq_line()+
+facet_grid(.~stream)
+ggplot(met, aes(y = meanQds.lcs, x = doy, color = Yf)) +
+geom_line() +
+facet_grid(. ~ stream)
+ggplot(met, aes(sample = meanQds.lcs, color = stream)) +stat_qq() + stat_qq_line()+
+facet_grid(.~stream)
+ggplot(met, aes(y = Tanom.iktCs, x = doy, color = Yf)) +
+geom_line() +
+facet_grid(. ~ stream)
+ggplot(met, aes(sample = Tanom.iktCs, color = stream)) +stat_qq() + stat_qq_line()+
+facet_grid(.~stream)
+ggplot(met, aes(y = Tanom.iktCs, x = meanQds.lcs, color = Yf)) +
+geom_point() +
+facet_grid(. ~ stream)
+met %>%
+group_by(stream) %>%
+summarize(currelation = cor(meanQdsCg, Tanom.iktCg))
+Qptemplm <- lm(meanQds.lcs ~ Tanom.iktCs + stream, met)
+Qxtemplm <- lm(meanQds.lcs ~ Tanom.iktCs * stream, met)
+model.sel(Qptemplm, Qxtemplm)
+DOYptemplm <- lm(doy ~ Tanom.iktCs + stream, met)
+DOYxtemplm <- lm(doy ~ Tanom.iktCs * stream, met)
+model.sel(DOYptemplm, DOYxtemplm)
+ggplot(met, aes(y = DOYres, x = doy)) +
+geom_point() +
+facet_grid(stream ~ treatment)
+met$Qres <- residuals(Qxtemplm)
+met$DOYres <- residuals(DOYptemplm)
+met$Tempres <- residuals(TempXdoylm)
+ggplot(met, aes(y = DOYres, x = doy)) +
+geom_point() +
+facet_grid(stream ~ treatment)
+ggplot() +
+geom_point(met, aes(y = DOYres, x = doy)) +
+geom_point(met, aes(y = Tanom.iktCs, x = doy), color = "blue") +
+facet_grid(stream ~ treatment)
+ggplot() +
+geom_point(data = met, aes(y = DOYres, x = doy)) +
+geom_point(data = met, aes(y = Tanom.iktCs, x = doy), color = "blue") +
+facet_grid(stream ~ treatment)
+ggplot() +
+geom_point(data = met, aes(y = DOYres, x = doy)) +
+geom_point(data = met, aes(y = Tanom.iktCs*20, x = doy), color = "blue") +
+facet_grid(stream ~ treatment)
+ggplot() +
+geom_point(data = met, aes(y = DOYres, x = doy)) +
+geom_point(data = met, aes(y = Tanom.iktCs*50, x = doy), color = "blue") +
+facet_grid(stream ~ treatment)
+ggplot() +
+geom_point(data = met, aes(y = DOYres, x = doy)) +
+geom_point(data = met, aes(y = -Tanom.iktCs*50, x = doy), color = "blue") +
+facet_grid(stream ~ treatment)
+load(file.path(here::here("04_SavedImages"), "02_ERanalyses_rdat"))
+library(tidyverse)
+library(here)
+library(mgcViz)
+library(MuMIn)
+library(mgcv)
+library(forecast)
+library(gridExtra)
+library(tidymv)
+library(ggpubr)
+# full with stream as temp or category
+g.er.modsel1t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel1s <-  uGamm(lER ~ treatment * stream  * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+# Qres only with stream as temp or category
+g.er.modsel2t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel2s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+# Doy only with stream as temp or category
+g.er.modsel3t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel3s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+g.er.Dredge_1t <-  dredge(global.model = g.er.modsel1t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_1s <-  dredge(global.model = g.er.modsel1s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2t <-  dredge(global.model = g.er.modsel2t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2s <-  dredge(global.model = g.er.modsel2s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3t <-  dredge(global.model = g.er.modsel3t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3s <-  dredge(global.model = g.er.modsel3s, evaluate = TRUE, rank = AIC)
+BestERCor <- corARMA(p = 3,q = 3, form = ~ doy | streamTreat)
+# full with stream as temp or category
+g.er.modsel1t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel1s <-  uGamm(lER ~ treatment * stream  * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+# Qres only with stream as temp or category
+g.er.modsel2t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel2s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres) + s(DOYres, by = stream),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+# Doy only with stream as temp or category
+g.er.modsel3t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+g.er.modsel3s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+s(Qres, by = stream) + s(DOYres),
+correlation = BestERCor, REML = FALSE, data = met,
+control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+g.er.Dredge_1t <-  dredge(global.model = g.er.modsel1t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_1s <-  dredge(global.model = g.er.modsel1s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2t <-  dredge(global.model = g.er.modsel2t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2s <-  dredge(global.model = g.er.modsel2s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3t <-  dredge(global.model = g.er.modsel3t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3s <-  dredge(global.model = g.er.modsel3s, evaluate = TRUE, rank = AIC)
+save.image(file.path(here::here("04_SavedImages"), "02_ERanalyses_rdat"))

@@ -1,0 +1,609 @@
+---
+title: "ER Analyses"
+author: "JMH"
+date: "9 Dec 2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo= FALSE}
+library(tidyverse)
+library(here)
+library(mgcViz)
+library(MuMIn)
+library(mgcv)
+library(forecast)
+library(gridExtra)
+library(tidymv)
+library(ggpubr)
+```
+
+# Load & munge data
+```{r}
+load(file.path(here::here("04_SavedImages"), "02_ERanalyses_rdat"))
+```
+
+
+```{r message=FALSE, warning=FALSE}
+met <- readr::read_csv(file = file.path(here::here("01_Data"),"01_MundgedMetabDat.csv")) %>% 
+  mutate(stream = fct_relevel(stream, c("st11U", "st18", "st6", "st9")),
+         treatment = fct_relevel(treatment, c("ambient", "nitrogen", "phosphorus")),
+         Yf = as.factor(Yf),
+         streamTreat = as.factor(streamTreat),
+         ppdoy180 = ifelse(doy <180,"l180", "g180"))%>%
+  # cutting it off here removes most of the weird, low ER values
+  filter(doy >=183) %>%
+  group_by(streamTreat) %>% 
+  dplyr::mutate(DD = cumsum(meanTemp)) %>% 
+  ungroup() %>% 
+  droplevels()
+
+```
+
+
+
+# ER Plots
+Big differences among treatments. Normalish
+```{r echo=FALSE}
+ggplot(met, aes(y = lER, x = doy, color = treatment, shape = ppdoy180)) +
+  geom_point()+
+  stat_smooth() +
+  facet_wrap(vars(stream))
+```
+
+```{recho=FALSE}
+ggplot(met, aes(y = meanQds, x = doy, color = treatment, shape = ppdoy180)) +
+  geom_point()+
+  stat_smooth() +
+  facet_wrap(vars(stream))
+```
+
+
+```{r echo=FALSE}
+ggplot(met, aes(sample = lER)) +stat_qq() + stat_qq_line() 
+```
+
+
+```{r echo=FALSE}
+ggplot(met, aes(sample = lER, color = stream)) +stat_qq() + stat_qq_line() +
+  facet_grid(.~stream)
+```
+
+
+
+Futzing to find a well-behaved global model
+```{r}
+# numerous models were evaluated in earlier versions
+g.er.global <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +  
+                       s(Qres, by = stream) + s(DOYres, by = stream),
+                     REML = FALSE, data = met,
+                     control = lmeControl(maxIter = 1e8, msMaxIter = 1e8))
+
+```
+
+
+
+```{r echo=FALSE}
+summary(g.er.global$gam)
+```
+
+```{r echo=FALSE}
+g.er.global.gv <- getViz(g.er.global$gam)
+print(plot(g.er.global.gv, allTerms = T), pages =1)
+```
+
+```{r echo=FALSE}
+check.gamViz(g.er.global.gv)
+```
+
+
+Autocorrelation - bad
+```{r echo= FALSE}
+
+# https://www.kaggle.com/timib1203/managing-many-models-with-tidyr-purrr-and-broom
+# https://jroy042.github.io/nonlinear/week4.html
+# https://stackoverflow.com/questions/47586110/autocorrelation-in-generalized-additive-models-gam
+g.er.global.acf <- met %>% 
+  mutate(g.erRes = resid(g.er.global$lme, type = "normalized")) %>% 
+  select(streamTreat, g.erRes) %>% 
+  group_by(streamTreat) %>% 
+  nest() %>% 
+  mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.erRes) + labs(title = streamTreat)))
+```
+
+```{r echo= FALSE}
+grid.arrange(grobs = g.er.global.acf$acf, ncol = 3)
+```
+
+Looks pretty good
+Reassuring discussion of concurvity: https://m-clark.github.io/generalized-additive-models/issues.html
+Longer discussion in Amodio et al. 2014
+```{r echo=FALSE}
+round(concurvity(g.er.global$gam, full = FALSE)$estimate,3)
+```
+Interesting thread on colinearity: https://stats.stackexchange.com/questions/100175/when-can-we-speak-of-collinearity/100272#100272
+
+## Determine ARMA model
+good explanation about why this is important in gams: https://fromthebottomoftheheap.net/2011/07/21/smoothing-temporally-correlated-data/
+
+Preliminary analysis indicated that there was significant autocorrelation. So the first step is to determine the autocorrelation structure. We'll use what is sort of a global model.
+
+```{r echo = FALSE, include = FALSE}
+g.er.AC_1.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                       s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 1,q = 0, form = ~ doy | streamTreat),
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+
+g.er.AC_1.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                       s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 1,q = 1, form = ~ doy | streamTreat),
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), REML = FALSE, data = met)
+
+g.er.AC_1.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +  
+                       s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 1,q = 2, form = ~ doy | streamTreat),
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+
+# g.er.AC_2.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+#                       s(Qres, by = stream) + s(DOYres, by = stream),
+#                 correlation = corARMA(p = 2,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+g.er.AC_2.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 2,q = 1, form = ~ doy | streamTreat),
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), REML = FALSE, data = met)
+
+g.er.AC_2.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 2,q = 2, form = ~ doy | streamTreat),
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), REML = FALSE, data = met)
+# 
+g.er.AC_3.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 3,q = 0, form = ~ doy | streamTreat),
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), REML = FALSE, data = met)
+
+g.er.AC_3.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 3,q = 1, form = ~ doy | streamTreat),
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), REML = FALSE, data = met)
+
+g.er.AC_3.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 3,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+g.er.AC_3.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 3,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+g.er.AC_3.4 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +  
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 3,q = 4, form = ~ doy | streamTreat), REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+g.er.AC_4.0 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 4,q =0, form = ~ doy | streamTreat), REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+
+# g.er.AC_4.1 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +  
+#                       s(Qres, by = stream) + s(DOYres, by = stream),
+#                 correlation = corARMA(p = 4,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+g.er.AC_4.2 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +  
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 4,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+g.er.AC_4.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +  
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 4,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+# g.er.AC_4.4 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +  
+#                       s(Qres, by = stream) + s(DOYres, by = stream),
+#                 correlation = corARMA(p = 4,q = 4, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+g.er.AC_5.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 5,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+
+g.er.AC_6.3 <- gamm(lER ~ treatment + invKT.C.StMean + Tanom.iktCs +  
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = corARMA(p = 6,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500))
+
+```
+
+Model selection indicates that 3.4 is the best model.
+```{r echo= FALSE}
+model.sel(g.er.AC_1.0$lme, 
+          g.er.AC_1.1$lme,
+          g.er.AC_1.2$lme, 
+          # g.er.AC_2.0$lme, 
+          g.er.AC_2.1$lme, 
+          g.er.AC_2.2$lme, 
+          g.er.AC_3.0$lme,
+          g.er.AC_3.1$lme, 
+          g.er.AC_3.2$lme,
+          g.er.AC_3.3$lme,
+          g.er.AC_3.4$lme, 
+          g.er.AC_4.0$lme,
+          # g.er.AC_4.1$lme, 
+          g.er.AC_4.2$lme, g.er.AC_4.3$lme, 
+          # g.er.AC_4.4$lme, 
+          g.er.AC_5.3$lme,
+          g.er.AC_6.3$lme) 
+```
+
+
+ACF: Much better. S6P only one with minor problems
+```{r echo= FALSE}
+
+# https://www.kaggle.com/timib1203/managing-many-models-with-tidyr-purrr-and-broom
+# https://jroy042.github.io/nonlinear/week4.html
+# https://stackoverflow.com/questions/47586110/autocorrelation-in-generalized-additive-models-gam
+g.er.AC_best.acf <- met %>% 
+  mutate(g.erRes = resid(g.er.AC_3.3$lme, type = "normalized")) %>% 
+  select(streamTreat, g.erRes) %>% 
+  group_by(streamTreat) %>% 
+  nest() %>% 
+  mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.erRes) + labs(title = streamTreat)))
+```
+
+```{r echo= FALSE}
+grid.arrange(grobs = g.er.AC_best.acf$acf, ncol = 3)
+```
+
+```{r echo=FALSE}
+g.er.AC_3.3.gv <- getViz(g.er.AC_3.3$gam)
+check(g.er.AC_3.3.gv)
+```
+
+# NEW MODEL SELECTION
+
+```{r echo= FALSE}
+BestERCor <- corARMA(p = 3,q = 3, form = ~ doy | streamTreat)
+```
+
+
+## Model sel
+
+```{r echo=FALSE, include = FALSE}
+# full with stream as temp or category
+g.er.modsel1t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+
+g.er.modsel1s <-  uGamm(lER ~ treatment * stream  * Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+
+# Qres only with stream as temp or category
+g.er.modsel2t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+                      s(Qres) + s(DOYres, by = stream),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+
+g.er.modsel2s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+                      s(Qres) + s(DOYres, by = stream),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+
+# Doy only with stream as temp or category
+g.er.modsel3t <-  uGamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 500), class = "gamm")
+
+g.er.modsel3s <-  uGamm(lER ~ treatment * stream * Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+
+g.er.Dredge_1t <-  dredge(global.model = g.er.modsel1t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_1s <-  dredge(global.model = g.er.modsel1s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2t <-  dredge(global.model = g.er.modsel2t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_2s <-  dredge(global.model = g.er.modsel2s, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3t <-  dredge(global.model = g.er.modsel3t, evaluate = TRUE, rank = AIC)
+g.er.Dredge_3s <-  dredge(global.model = g.er.modsel3s, evaluate = TRUE, rank = AIC)
+```
+
+
+
+```{r echo=FALSE}
+g.erDredgeSum1 <- merge(g.er.Dredge_1t, g.er.Dredge_1s)
+g.erDredgeSum2 <- merge(g.er.Dredge_2t, g.er.Dredge_2s)
+g.erDredgeSum3 <- merge(g.er.Dredge_3t, g.er.Dredge_3s)
+g.erDredgeSumF0 <- merge(g.erDredgeSum1, g.erDredgeSum2)
+g.erDredgeSumF <- merge(g.erDredgeSumF0, g.erDredgeSum3)
+```
+
+Only 1 model less than 2.
+All of the models <10 have an interactions between the temps. First model with annual mean temp has delta AIC of 28
+```{r echo=FALSE}
+subset(g.erDredgeSumF, delta <= 10)
+```
+
+
+### Best models
+```{r}
+g.er.BEST1 <- gamm(lER ~ treatment * stream * Tanom.iktCs +
+                      s(Qres, by = stream) + s(DOYres),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+
+g.er.BEST2 <- gamm(lER ~ treatment * stream + treatment * Tanom.iktCs + stream * Tanom.iktCs  +
+                      s(Qres, by = stream) + s(DOYres),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+```
+
+### Best with stream temp
+```{r}
+g.er.BEST1.s <- gamm(lER ~ treatment * Tanom.iktCs + invKT.C.StMean * Tanom.iktCs +
+                      s(Qres, by = stream),
+                correlation = BestERCor, REML = FALSE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+```
+
+
+
+lER ~ treatment * stream * Tanom.iktCs + s(Qres, by = stream) + s(DOYres)
+R2 = 0.86
+Sig? This is a pain to interpret!
+N and P
+S6: N x T & P X T
+18: P
+S6: P
+
+
+```{r}
+summary(g.er.BEST1$gam)
+```
+
+
+lER ~ treatment * stream + treatment * Tanom.iktCs + stream * Tanom.iktCs + s(Qres, by = stream) + s(DOYres)
+R2 = 
+```{r}
+summary(g.er.BEST2$gam)
+```
+
+lER ~ treatment * Tanom.iktCs + invKT.C.StMean * Tanom.iktCs + s(Qres, by = stream) + s(DOYres)
+R2 = 0.683
+```{r}
+summary(g.er.BEST1.s$gam)
+```
+
+
+
+Still some concurvity b/w Q and T, but it is manageable
+```{r echo=FALSE}
+round(concurvity(g.er.BEST1$gam, full = FALSE)$estimate,3)
+round(concurvity(g.er.BEST2$gam, full = FALSE)$estimate,3)
+round(concurvity(g.er.BEST1.s$gam, full = FALSE)$estimate,3)
+```
+
+Seems like the corr structure messes up the residuals
+```{r echo=FALSE}
+g.er.BEST1.gv <- getViz(g.er.BEST1$gam)
+g.er.BEST2.gv <- getViz(g.er.BEST2$gam)
+g.er.BEST1.s.gv <- getViz(g.er.BEST1.s$gam)
+```
+
+The full interaction model has best residuals.
+```{r}
+check(g.er.BEST1.gv)
+```
+
+```{r}
+check(g.er.BEST2.gv)
+```
+
+```{r}
+check(g.er.BEST1.s.gv)
+```
+
+
+One last check on the autocorrelation. Just foucsing on 3. Some remaining with S9 amb, S11U amb, S18 amb
+```{r echo= FALSE}
+g.er.best1.acf <- met %>% 
+  mutate(g.erRes = resid(g.er.BEST1$lme, type = "normalized")) %>% 
+  select(streamTreat, g.erRes) %>% 
+  group_by(streamTreat) %>% 
+  nest() %>% 
+  mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.erRes) + labs(title = streamTreat)))
+```
+
+```{r echo= FALSE}
+grid.arrange(grobs = g.er.best1.acf$acf, ncol = 3)
+```
+
+
+### Look at resid
+
+```{r echo=FALSE}
+metBestTest <- met %>% 
+  mutate(erres1 = residuals(g.er.BEST1$gam, type = "response"),
+         erPred1 = predict(g.er.BEST1$gam, type = "response"),
+         erres2 = residuals(g.er.BEST2$gam, type = "response"),
+         erPred2 = predict(g.er.BEST2$gam, type = "response"),
+         erres3.s = residuals(g.er.BEST1.s$gam, type = "response"),
+         erPred3.s = predict(g.er.BEST1.s$gam, type = "response"))
+```
+
+# Check residuals
+Still some signal with doy. Also early dates with S18-P giving problems
+Not much of a difference between 1 and 2.
+```{r echo=FALSE}
+ggplot(metBestTest, aes(y = erres1, x = doy, color = stream, shape = treatment)) +
+  geom_point() +
+  facet_grid(stream ~ treatment) 
+```
+
+```{r echo=FALSE}
+ggplot(metBestTest, aes(y = erres2, x = doy, color = stream, shape = treatment)) +
+  geom_point() +
+  facet_grid(stream ~ treatment) 
+```
+
+
+1 and 2 both do a good job. 2, with full parameteric interactions, has tighter, better residuals. But is it worth it!
+```{r echo=FALSE}
+ggplot(metBestTest, aes(y = lER, x = erPred1, color = stream, shape = treatment)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1)
+```
+
+```{r echo=FALSE}
+ggplot(metBestTest, aes(y = lER, x = erPred2, color = stream, shape = treatment)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1)
+```
+
+
+
+### Save predictions
+```{r echo= FALSE}
+met$ERAllgamPred1 <- predict.gam(g.er.BEST1$gam, met, type = "response")
+met$ERAllgamPred1.se <- predict.gam(g.er.BEST1$gam, met, type = "response", se.fit = TRUE)$se.fit
+met$ERAllgamPred1s <- predict.gam(g.er.BEST1.s$gam, met, type = "response")
+met$ERAllgamPred1s.se <- predict.gam(g.er.BEST1.s$gam, met, type = "response", se.fit = TRUE)$se.fit
+```
+
+### save results
+```{r echo = FALSE, include = FALSE}
+saveRDS(g.er.BEST1,
+        file = file.path(here::here("05_SavedModels"), "02_ERallBest.rds"))
+saveRDS(g.er.BEST1.s,
+        file = file.path(here::here("05_SavedModels"), "02_ERallBestTemp.rds"))
+```
+
+```{r}
+readr::write_csv(met, file.path(here::here("01_Data"), "02_PostERmet.csv"))
+```
+
+```{r}
+save.image(file.path(here::here("04_SavedImages"), "02_ERanalyses_rdat"))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+# summary Plots
+Focusing on this
+```{r}
+summary(g.er.BEST1$gam)
+```
+
+## Predictions
+```{r}
+pdf(file.path(here::here("03_Plots"), "02a_ERpredictionXdoy.pdf"), height = 4, width = 8)
+ggplot() +
+  geom_point(data = met, aes(y = lER, x = doy, color = treatment)) +
+  geom_line(data = met, aes(y = ERgamPred, x = doy, color = treatment)) +
+  geom_ribbon(data = met, aes(ymin = ERgamPred - ERgamPred.se,
+                              ymax = ERgamPred + ERgamPred.se, x = doy, fill = treatment), alpha = 0.5) +
+  facet_grid(stream ~ treatment)
+dev.off()
+```
+
+
+
+Use model to predict log ER, with Qres, doy and stream set to "centered" values
+```{r}
+gamPred2 <- predict_gam(g.er.BEST1$gam, exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(doy):streamst11U",
+                                            "s(doy):streamst18",
+                                            "s(doy):streamst6",
+                                            "s(doy):streamst9"),
+                                            values  = list(
+                                              Qres = 0,
+                                              doy = 200,
+                                              stream = "st6")) 
+
+# make the temperature axes sensical
+gamPred3 <- gamPred2 %>% 
+                mutate(Tanom.iktCsFlip = -1 * Tanom.iktCs,
+                       invKT.C.StMeanFlip = -1 *invKT.C.StMean)
+
+```
+
+**NOTE: TEMPERATURE AXIS ARE FLIPPED SO LARGE #'S ARE WARM**
+During amb year, ER increases with daily temp and with annual temp across streams. Duing the N and P years, this switches. We see ER increasing with annual temp again, but decreasing with daily temp. Cool
+
+```{r}
+ErPredSur <- ggplot() +
+  geom_raster(data = gamPred2, aes(y = -invKT.C.StMean, x = -Tanom.iktCs, fill = fit)) +
+  facet_wrap(vars(treatment)) +
+  scale_fill_distiller(palette = "Spectral") +
+  geom_point(data = met, aes(y = -invKT.C.StMean, x = -Tanom.iktCs, size = lER), 
+             position = position_jitter(width = 0.05, height = 0.025), shape = 21, fill = "transparent", alpha= 0.5) +
+  scale_size_binned(n.breaks = 4, nice.breaks = TRUE) +
+  ylab("Mean summer temp (-1 * centered 1/kT)") +
+  xlab("Mean daily temp (-1 * centered 1/kT)")
+```
+
+
+```{r}
+gamPred2w <- gamPred2 %>% 
+  pivot_wider(id_cols = Tanom.iktCs:doy, names_from = treatment, values_from = c(fit,se.fit)) %>% 
+  mutate(N_amb = exp(fit_nitrogen)/exp(fit_ambient),
+         P_amb = exp(fit_phosphorus)/exp(fit_ambient))
+
+gamPred2w2 <- gamPred2w %>% 
+  select(Tanom.iktCs:doy, fit_ambient:P_amb) %>% 
+  pivot_longer(cols = N_amb:P_amb, names_to = "treatment", values_to = "effectSize") %>% 
+  mutate(treatment = fct_recode(treatment, Nitrogen = "N_amb", Phosphorus = "P_amb"))
+```
+
+
+```{r}
+pdf(file.path(here::here("03_Plots"), "02b_ERpredictionSurfaces.pdf"), height = 4, width = 8)
+ErPredSur
+dev.off()
+```
+
+```{r}
+pdf(file.path(here::here("03_Plots"), "02c_ERdifferencePlots2.pdf"), height = 5, width = 4)
+ggplot(gamPred2w2, aes(y = -invKT.C.StMean, x = -Tanom.iktCs, fill = effectSize)) +
+  geom_raster() +
+  scale_fill_distiller(palette = "Spectral") +
+  ylab("Mean summer temp (-1 * centered 1/kT)") +
+  xlab("Mean daily temp (-1 * centered 1/kT)") +
+  facet_wrap(vars(treatment), nrow = 2, ncol = 1)
+dev.off()
+```
+
+
+
+
+
+
+
+

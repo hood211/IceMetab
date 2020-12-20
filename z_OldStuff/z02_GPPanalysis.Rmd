@@ -1,0 +1,338 @@
+---
+title: "GPP analysis"
+author: "JMH"
+date: "11/3/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+# Analysis of ER response to N and P enrichment
+## Libraries
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(gamm4)
+library(mgcViz)
+library(MuMIn)
+library(forecast)
+library(gridExtra)
+library(tidymv)
+
+```
+
+## Load & munge data
+
+Loads data, calculates log GPP and ER, does a ridiculous transformation of NEP, and centers stream water temp at 10C as inverse kT
+```{r message=FALSE, warning=FALSE}
+met2 <- read.csv("00_metab_for_Hoodie.csv") %>% 
+  mutate(Pdt = as.POSIXct(Pdt, format = "%m/%d/%y"),
+         doy = as.numeric(strftime(Pdt, format = "%j")),
+         Y = as.numeric(strftime(Pdt, format = "%Y")),
+         Yf = as.factor(as.character(Y)),
+         lGPP = log(GPP_median),
+         lER = log(-ER_median),
+         #centering
+         invKT.C = one_over_kT - 1/((10 + 273.15)*0.0000862),
+         streamTreat = as.factor(paste0(stream,"_",treatment))) %>% 
+  mutate_at(vars(stream, treatment), funs(as.factor(.))) %>% 
+  rename(invKT = one_over_kT)
+```
+
+For predictor variables, we want to center Temp, light, Q, and GPP. We'll do that using stream means, which we calculate below
+```{r}
+# stream mean
+metS <- met2 %>% 
+  group_by(stream, treatment) %>% 
+  summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE))) %>% 
+  group_by(stream) %>% 
+  summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE))) %>% 
+  rename_at(vars(-stream), function(x) paste0(x,".StMean"))
+
+# global mean
+metG0 <- met2 %>% 
+  group_by(stream, treatment) %>% 
+  summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE))) %>% 
+  group_by(stream) %>% 
+  summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE))) %>% 
+  group_by() %>% 
+  summarise_at(vars(meanTemp, invKT.C, meanQds, LightPerDay, lGPP), funs(mean(., na.rm = TRUE)))%>% 
+  rename_at(vars(meanTemp:lGPP), function(x) paste0(x,".GMean"))
+
+metG <- rbind(metG0, metG0, metG0, metG0)
+metG$stream <- c("st11U", "st18", "st6", "st9")
+```
+
+Now, we log transform Q, GPP, and light then center on mean logged value (you can't center then log). 
+```{r}
+met <- met2 %>% 
+  full_join(metS, by = "stream") %>% 
+  full_join(metG, by = "stream") %>% 
+  #these are centered on the stream mean
+  mutate(Tanom.iktCs = invKT.C - invKT.C.StMean, 
+         Tanom.iktCg = invKT.C - invKT.C.GMean, 
+         Tanom.Cs = meanTemp - meanTemp.StMean,
+         Tanom.Cg = meanTemp - meanTemp.GMean,
+         LightPerDayCs = LightPerDay - LightPerDay.StMean,
+         LightPerDayCg = LightPerDay - LightPerDay.GMean,
+         meanQdsCs = meanQds - meanQds.StMean,
+         meanQdsCg = meanQds - meanQds.GMean,
+         LightPerDay.l = log(LightPerDay),
+         meanQds.l = log(meanQds),
+         LightPerDay.lcs = LightPerDay.l - log(LightPerDay.StMean),
+         LightPerDay.lcg = LightPerDay.l - log(LightPerDay.GMean),
+         meanQds.lcs = meanQds.l - log(meanQds.StMean),
+         meanQds.lcg = meanQds.l - log(meanQds.GMean),
+         lGPP.cs = lGPP - lGPP.StMean,
+         lGPP.cg = lGPP - lGPP.GMean,
+         streamTreat = paste0(stream," ", treatment),
+         stream = as.factor(stream))
+```
+
+
+## Quick visualization
+### GPP
+Focus on GPP response.
+
+
+```{r echo=FALSE}
+ggplot(met, aes(y = lGPP, x = doy, color = Yf)) +
+  geom_line() +
+  facet_grid(. ~ stream)
+```
+
+Access normality: 
+log GPP - not terrible
+
+```{r echo=FALSE}
+ggplot(met, aes(sample = lGPP, color = stream)) +stat_qq() + stat_qq_line() +
+  facet_grid(.~stream)
+```
+
+
+For Q we want to center on the stream mean, not the global. Leaving the among stream variation for temp to explain
+
+```{r echo=FALSE}
+ggplot(met, aes(y = meanQds.lcs, x = doy, color = Yf)) +
+  geom_line() +
+  facet_grid(. ~ stream)
+```
+
+
+# GPP models
+
+Likely maximal models
+model with light won't converge with a 'by = stream'
+
+```{r}
+g.gpp.PutGLOB0s <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) , REML = FALSE, data = met)
+g.gpp.PutGLOB1s <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) + 
+                     s(LightPerDay.lcg), REML = FALSE, data = met)
+
+```
+
+Light model is massively better
+```{r}
+model.sel(g.gpp.PutGLOB0s$lme, g.gpp.PutGLOB1s$lme)
+```
+
+
+```{r}
+summary(g.gpp.PutGLOB1s$gam)
+```
+
+```{r}
+g.gpp.PutGLOB1s.b <- getViz(g.gpp.PutGLOB1s$gam)
+```
+
+pretty good
+```{r}
+check(g.gpp.PutGLOB1s.b)
+```
+
+
+So autocorrelation
+```{r}
+# https://www.kaggle.com/timib1203/managing-many-models-with-tidyr-purrr-and-broom
+met.PutGLOB <- met %>% 
+  mutate(g.gppRes = resid(g.gpp.PutGLOB1s$lme, type = "normalized")) %>% 
+  select(streamTreat, g.gppRes) %>% 
+  group_by(streamTreat) %>% 
+  nest() %>% 
+  mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.gppRes) + labs(title = streamTreat)))
+```
+
+
+```{r}
+grid.arrange(grobs = met.PutGLOB$acf, ncol = 3)
+```
+
+Evaluate different corr structures
+```{r}
+g.gpp.AC_1.0 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) + 
+                     s(LightPerDay.lcg), 
+                correlation = corARMA(p = 1,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met)
+
+g.gpp.AC_1.1 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) + 
+                      s(LightPerDay.lcg), 
+                correlation = corARMA(p = 1,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met)
+
+g.gpp.AC_1.2 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) +
+                      s(LightPerDay.lcg), 
+                correlation = corARMA(p = 1,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met)
+
+g.gpp.AC_2.0 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) + 
+                      s(LightPerDay.lcg), 
+                correlation = corARMA(p = 2,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met)
+
+
+g.gpp.AC_2.1 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) +
+                      s(LightPerDay.lcg), 
+                correlation = corARMA(p = 2,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met)
+
+g.gpp.AC_2.2 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) +
+                      s(LightPerDay.lcg), 
+                correlation = corARMA(p = 2,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met)
+# doesn't work
+g.gpp.AC_3.0 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) +
+                      s(LightPerDay.lcg), 
+                correlation = corARMA(p = 3,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met)
+
+g.gpp.AC_3.1 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) +
+                      s(LightPerDay.lcg), 
+                correlation = corARMA(p = 3,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met)
+# 
+g.gpp.AC_3.2 <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream) +
+                      s(LightPerDay.lcg), 
+                correlation = corARMA(p = 3,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met)
+```
+
+Model selection
+```{r}
+model.sel(g.gpp.AC_1.0$lme, g.gpp.AC_1.1$lme, g.gpp.AC_1.2$lme, g.gpp.AC_2.0$lme,
+          g.gpp.AC_2.1$lme, g.gpp.AC_2.2$lme, g.gpp.AC_3.0$lme, g.gpp.AC_3.1$lme, g.gpp.AC_3.2$lme) 
+
+```
+
+Looking great!
+```{r}
+
+# https://www.kaggle.com/timib1203/managing-many-models-with-tidyr-purrr-and-broom
+# https://jroy042.github.io/nonlinear/week4.html
+# https://stackoverflow.com/questions/47586110/autocorrelation-in-generalized-additive-models-gam
+g.gpp.AC_best.acf <- met %>% 
+  mutate(g.gppRes = resid(g.gpp.AC_2.2$lme, type = "normalized")) %>% 
+  select(streamTreat, g.gppRes) %>% 
+  group_by(streamTreat) %>% 
+  nest() %>% 
+  mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.gppRes) + labs(title = streamTreat)))
+```
+
+```{r}
+grid.arrange(grobs = g.gpp.AC_best.acf$acf, ncol = 3)
+```
+
+```{r}
+BestGPPCor <- corARMA(p = 2,q = 2, form = ~ doy | streamTreat)
+```
+
+```{r}
+# STREAM CENTgppED Q
+g.gpp.NutXTs <- gamm(lGPP ~ treatment*invKT.C.StMean +  s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met)
+
+g.gpp.NutpTs <- gamm(lGPP ~ treatment + invKT.C.StMean +  s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met)
+
+g.gpp.NutXsts <- gamm(lGPP ~ treatment*stream +  s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met)
+
+g.gpp.Nutpsts <- gamm(lGPP ~ treatment + stream +  s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met)
+
+g.gpp.Nuts <- gamm(lGPP ~ treatment +  s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met)
+
+g.gpp.Ts <- gamm(lGPP ~ invKT.C.StMean +  s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met)
+
+g.gpp.sts <- gamm(lGPP ~ stream +  s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met)
+
+g.gpp.nulls <- gamm(lGPP ~ s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met) 
+
+g.gpp.nullsnoL <- gamm(lGPP ~ s(meanQds.lcs, by = stream),
+                correlation = BestGPPCor, REML = FALSE, data = met) 
+
+g.gpp.nullnoQs <- gamm(lGPP ~ s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = FALSE, data = met) 
+
+```
+
+This is less than definitive. models with temp only, stream only, treatment + stream, and treatment + temperature are all equally likely. We'll focus on treatment + temperature because it addresses our questions
+```{r}
+model.sel(g.gpp.NutXTs$lme, g.gpp.NutpTs$lme, g.gpp.NutXsts$lme, g.gpp.Nutpsts$lme, g.gpp.Nuts$lme, g.gpp.Ts$lme, g.gpp.sts$lme, g.gpp.nulls$lme,
+          g.gpp.nullsnoL$lme, g.gpp.nullnoQs$lme)
+```
+
+The best model. see above
+```{r}
+g.gpp.best <-  gamm(lGPP ~ treatment + invKT.C.StMean +  s(meanQds.lcs, by = stream)+
+                      s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = TRUE, data = met)
+```
+
+
+Significant effect of temperature. Marginal effect on N, no effect of P
+```{r}
+summary(g.gpp.best$gam)
+g.gpp.best.b <- getViz(g.gpp.best$gam)
+```
+
+
+Pretty good models
+```{r}
+check(g.gpp.best.b)
+```
+
+
+
+Autocorrelation
+looks pretty good
+```{r}
+g.gpp.best.acf <- met %>% 
+  mutate(g.gppRes = resid(g.gpp.best$lme, type = "normalized")) %>% 
+  select(streamTreat, g.gppRes) %>% 
+  group_by(streamTreat) %>% 
+  nest() %>% 
+  mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.gppRes) + labs(title = streamTreat)))
+```
+
+```{r}
+grid.arrange(grobs = g.gpp.best.acf$acf, ncol = 3)
+```
+
+
+
+```{r}
+GPPmod1 <- plot(g.gpp.best.b, allTerms = 1) +
+  l_points(color = "blue") + l_fitLine(linetype = 3) + l_fitContour() + 
+      l_ciLine(colour = 2) + l_ciBar() + l_fitPoints(size = 1, col = 2) + theme_get() + labs(title = NULL)
+
+print(GPPmod1, pages = 1)
+```
+
+```{r include = FALSE}
+# save.image("02_GPPanalysis_rdat")
+```
+
+
