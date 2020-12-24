@@ -150,7 +150,7 @@ subset(g.erDredgeSumF, delta <= 2)
 ```{r}
 g.er.BEST <- gamm(lER ~ treatment * stream + treatment * Tanom.iktCs + stream * Tanom.iktCs  +
                       s(Qres, by = stream) + s(DOYres, by = stream),
-                correlation = BestERCor, REML = FALSE, data = met,
+                correlation = BestERCor, REML = TRUE, data = met,
                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
 ```
 
@@ -164,7 +164,7 @@ Best with stream temp
 ```{r}
 g.er.BEST_t <- gamm(lER ~ treatment * Tanom.iktCs + invKT.C.StMean * Tanom.iktCs  + invKT.C.StMean * treatment +
                       s(Qres, by = stream) + s(DOYres),
-                correlation = BestERCor, REML = FALSE, data = met,
+                correlation = BestERCor, REML = TRUE, data = met,
                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
 ```
 
@@ -287,13 +287,13 @@ ggplot(metBestTest, aes(y = lER, x = erPred2, color = stream, shape = treatment)
 
 ### save results
 ```{r echo = FALSE, include = FALSE}
-saveRDS(g.er.BEST,
-        file = file.path(here::here("05_SavedModels"), "02a_ER_P_Best.rds"))
-saveRDS(g.er.BEST_t,
-        file = file.path(here::here("05_SavedModels"), "02a_ER_P_BestTemp.rds"))
+# saveRDS(g.er.BEST,
+#         file = file.path(here::here("05_SavedModels"), "02a_ER_P_Best.rds"))
+# saveRDS(g.er.BEST_t,
+#         file = file.path(here::here("05_SavedModels"), "02a_ER_P_BestTemp.rds"))
 ```
 
 
 ```{r}
-save.image(file.path(here::here("04_SavedImages"), "02c_ERanalysesPonly_rdat"))
+# save.image(file.path(here::here("04_SavedImages"), "02c_ERanalysesPonly_rdat"))
 ```

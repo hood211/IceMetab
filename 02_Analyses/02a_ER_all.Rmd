@@ -337,25 +337,31 @@ Model selection for all models
 subset(g.erDredgeSumF, delta <= 2)
 ```
 
+```{r}
+g.er.BEST <- gamm(lER ~ treatment * stream + treatment * Tanom.iktCs + stream * Tanom.iktCs  +
+                      s(Qres, by = stream) + s(DOYres, by = stream),
+                correlation = BestERCor, REML = TRUE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+
+
+```
 
 Stream Temperature models; AIC difference of -311.1 - -301.9 
 ```{r echo=FALSE}
 subset(g.erDredgeSumtF, delta <= 2)
 ```
 
-### Best models
-#### Overall
- 
+
+Best with stream temp
 ```{r}
-g.er.BEST <- gamm(lER ~ treatment * stream + treatment * Tanom.iktCs + stream * Tanom.iktCs  +
-                      s(Qres, by = stream) + s(DOYres, by = stream),
-                correlation = BestERCor, REML = FALSE, data = met,
+g.er.BEST_t <- gamm(lER ~ treatment * Tanom.iktCs + invKT.C.StMean * Tanom.iktCs  +
+                      s(Qres, by = stream) + s(DOYres),
+                correlation = BestERCor, REML = TRUE, data = met,
                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-
 ```
 
-
+### Best models
+#### Overall
 lER ~ treatment * stream + treatment * Tanom.iktCs + stream * Tanom.iktCs + 
       s(Qres, by = stream) + s(DOYres, by = stream)
 R2 = 0.92
@@ -419,13 +425,7 @@ ggplot(metBestTest, aes(y = lER, x = erPred1, color = stream, shape = treatment)
 
 
 #### stream temp
-Best with stream temp
-```{r}
-g.er.BEST_t <- gamm(lER ~ treatment * Tanom.iktCs + invKT.C.StMean * Tanom.iktCs  +
-                      s(Qres, by = stream) + s(DOYres),
-                correlation = BestERCor, REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-```
+
 
 lER ~ treatment * Tanom.iktCs + invKT.C.StMean * Tanom.iktCs + 
     s(Qres, by = stream) + s(DOYres)
@@ -477,15 +477,12 @@ ggplot(metBestTest, aes(y = lER, x = erPred2, color = stream, shape = treatment)
 
 ### save results
 ```{r echo = FALSE, include = FALSE}
-# saveRDS(g.er.BEST,
-#         file = file.path(here::here("05_SavedModels"), "02a_ERall_Best.rds"))
-# saveRDS(g.er.BEST_t,
-#         file = file.path(here::here("05_SavedModels"), "02a_ERall_BestTemp.rds"))
+saveRDS(g.er.BEST,
+        file = file.path(here::here("05_SavedModels"), "02a_ERall_Best.rds"))
+saveRDS(g.er.BEST_t,
+        file = file.path(here::here("05_SavedModels"), "02a_ERall_BestTemp.rds"))
 ```
 
-```{r echo = FALSE, include = FALSE}
-# readr::write_csv(met, file.path(here::here("01_Data"), "02_PostERmet.csv"))
-```
 
 ```{r echo = FALSE, include = FALSE}
 # save.image(file.path(here::here("04_SavedImages"), "02_ERanalyses_rdat"))

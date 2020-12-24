@@ -23,7 +23,7 @@ library(gridExtra)
 
 # Load & munge data
 ```{r}
-# load(file.path(here::here("04_SavedImages"), "03_GPPanalyses_rdat"))
+load(file.path(here::here("04_SavedImages"), "03b_GPPanalysesPonly_rdat"))
 ```
 
 
@@ -63,43 +63,43 @@ BestGPPCor <- corARMA(p = 3,q = 2, form = ~ doy | streamTreat)
 
 ## Model selection
 ```{r echo=FALSE, include = FALSE}
-g.gpp.modsel1t <- uGamm(lGPP ~ treatment * invKT.C.StMean * Tanom.iktCs +
-                     s(Qres, by = stream) + s(DOYres, by = stream) + s(LightPerDay.lcg),
-                correlation = BestGPPCor, REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
-
-g.gpp.modsel1s <- uGamm(lGPP ~ treatment * stream * Tanom.iktCs +
-                     s(Qres, by = stream) + s(DOYres, by = stream) + s(LightPerDay.lcg),
-                correlation = BestGPPCor, REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
-
-
-g.gpp.modsel2t <- uGamm(lGPP ~ treatment * invKT.C.StMean * Tanom.iktCs +
-                     s(Qres) + s(DOYres, by = stream) + s(LightPerDay.lcg),
-                correlation = BestGPPCor, REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
-
-g.gpp.modsel2s <- uGamm(lGPP ~ treatment * stream * Tanom.iktCs +
-                     s(Qres) + s(DOYres, by = stream) + s(LightPerDay.lcg),
-                correlation = BestGPPCor, REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
-
-g.gpp.modsel3t <- uGamm(lGPP ~ treatment * invKT.C.StMean * Tanom.iktCs +
-                     s(Qres, by = stream) + s(DOYres) + s(LightPerDay.lcg),
-                correlation = BestGPPCor, REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
-
-g.gpp.modsel3s <- uGamm(lGPP ~ treatment * stream * Tanom.iktCs +
-                     s(Qres, by = stream) + s(DOYres) + s(LightPerDay.lcg),
-                correlation = BestGPPCor, REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
-
-g.gpp.Dredge_1t <-  dredge(global.model = g.gpp.modsel1t, evaluate = TRUE, rank = AIC)
-g.gpp.Dredge_1s <-  dredge(global.model = g.gpp.modsel1s, evaluate = TRUE, rank = AIC)
-g.gpp.Dredge_2t <-  dredge(global.model = g.gpp.modsel2t, evaluate = TRUE, rank = AIC)
-g.gpp.Dredge_2s <-  dredge(global.model = g.gpp.modsel2s, evaluate = TRUE, rank = AIC)
-g.gpp.Dredge_3t <-  dredge(global.model = g.gpp.modsel3t, evaluate = TRUE, rank = AIC)
-g.gpp.Dredge_3s <-  dredge(global.model = g.gpp.modsel3s, evaluate = TRUE, rank = AIC)
+# g.gpp.modsel1t <- uGamm(lGPP ~ treatment * invKT.C.StMean * Tanom.iktCs +
+#                      s(Qres, by = stream) + s(DOYres, by = stream) + s(LightPerDay.lcg),
+#                 correlation = BestGPPCor, REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+# 
+# g.gpp.modsel1s <- uGamm(lGPP ~ treatment * stream * Tanom.iktCs +
+#                      s(Qres, by = stream) + s(DOYres, by = stream) + s(LightPerDay.lcg),
+#                 correlation = BestGPPCor, REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+# 
+# 
+# g.gpp.modsel2t <- uGamm(lGPP ~ treatment * invKT.C.StMean * Tanom.iktCs +
+#                      s(Qres) + s(DOYres, by = stream) + s(LightPerDay.lcg),
+#                 correlation = BestGPPCor, REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+# 
+# g.gpp.modsel2s <- uGamm(lGPP ~ treatment * stream * Tanom.iktCs +
+#                      s(Qres) + s(DOYres, by = stream) + s(LightPerDay.lcg),
+#                 correlation = BestGPPCor, REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+# 
+# g.gpp.modsel3t <- uGamm(lGPP ~ treatment * invKT.C.StMean * Tanom.iktCs +
+#                      s(Qres, by = stream) + s(DOYres) + s(LightPerDay.lcg),
+#                 correlation = BestGPPCor, REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+# 
+# g.gpp.modsel3s <- uGamm(lGPP ~ treatment * stream * Tanom.iktCs +
+#                      s(Qres, by = stream) + s(DOYres) + s(LightPerDay.lcg),
+#                 correlation = BestGPPCor, REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000), class = "gamm")
+# 
+# g.gpp.Dredge_1t <-  dredge(global.model = g.gpp.modsel1t, evaluate = TRUE, rank = AIC)
+# g.gpp.Dredge_1s <-  dredge(global.model = g.gpp.modsel1s, evaluate = TRUE, rank = AIC)
+# g.gpp.Dredge_2t <-  dredge(global.model = g.gpp.modsel2t, evaluate = TRUE, rank = AIC)
+# g.gpp.Dredge_2s <-  dredge(global.model = g.gpp.modsel2s, evaluate = TRUE, rank = AIC)
+# g.gpp.Dredge_3t <-  dredge(global.model = g.gpp.modsel3t, evaluate = TRUE, rank = AIC)
+# g.gpp.Dredge_3s <-  dredge(global.model = g.gpp.modsel3s, evaluate = TRUE, rank = AIC)
 ```
 
 
@@ -112,124 +112,162 @@ g.gppDredgeSumF <- merge(g.gppDredgeSumT2, g.gppDredgeSumS2)
 ```
 
 
-All of the models <10 have an interactions between the temps
-```{r}
+Model selection for all models
+```{r echo=FALSE}
 subset(g.gppDredgeSumF, delta <= 2)
+```
+
+```{r}
+g.gpp.BEST <- gamm(lGPP ~ treatment* Tanom.iktCs + stream * Tanom.iktCs + treatment *stream +
+                     s(Qres, by = stream) + s(DOYres, by = stream) + s(LightPerDay.lcg),
+                correlation = BestGPPCor, REML = TRUE, data = met,
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+```
+
+Stream Temperature models; AIC difference 23
+```{r echo=FALSE}
 subset(g.gppDredgeSumT2, delta <= 2)
 ```
 
-```{r echo=FALSE}
-g.gppBEST1.A <- gamm(lGPP ~ treatment + stream * Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy) + s(LightPerDay.lcg), 
+```{r}
+-203.6--180.6
+```
+
+
+Best with stream temp. Treatment not in best model!
+```{r}
+g.gpp.BEST_t <- gamm(lGPP ~ invKT.C.StMean * Tanom.iktCs +
+                     s(Qres, by = stream) + s(DOYres, by = stream) + s(LightPerDay.lcg),
                 correlation = BestGPPCor, REML = TRUE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8))
+                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
 ```
 
-```{r echo=FALSE}
-g.gppBEST2 <- gamm(lGPP ~ treatment * invKT.C.StMean + treatment * Tanom.iktCs + invKT.C.StMean * Tanom.iktCs +
-                     s(Qres, by = stream) + s(doy) + s(LightPerDay.lcg), 
-                correlation = BestGPPCor, REML = TRUE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8))
+### Best models
+#### Overall
+ 
+lGPP ~ treatment * Tanom.iktCs + stream * Tanom.iktCs + treatment * stream + 
+    s(Qres, by = stream) + s(DOYres, by = stream) + s(LightPerDay.lcg)
+R2 = 0.91
+Sig P effect in S18 and S6 (and probably S11U)
+
+```{r}
+summary(g.gpp.BEST$gam)
 ```
 
-```{r echo=FALSE}
-g.gppBEST3 <- gamm(lGPP ~ treatment + invKT.C.StMean * Tanom.iktCs +
-                     s(Qres, by = stream) + s(doy) + s(LightPerDay.lcg), 
-                correlation = BestGPPCor, REML = TRUE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8))
-```
-
-lGPP ~ treatment * invKT.C.StMean * Tanom.iktCs + s(Qres, by = stream) + s(doy) + s(LightPerDay.lcg)
-R2 = 0.58
-Sig N X stream Temp X daily temp
-```{r echo=FALSE}
-summary(g.gppBEST1$gam)
-```
-
-
-lGPP ~ treatment * invKT.C.StMean + treatment * Tanom.iktCs + invKT.C.StMean * Tanom.iktCs + s(Qres, by = stream) + s(doy) + s(LightPerDay.lcg)
-R2 = 0.57
-Sig N * daily temp
-Sig stream Temp * daily temp
-NS: N * stream Temp
-```{r echo=FALSE}
-summary(g.gppBEST2$gam)
-```
-
-lGPP ~ treatment + invKT.C.StMean * Tanom.iktCs + s(Qres, by = stream) + s(doy) + s(LightPerDay.lcg)
-R2 = 0.57
-Sig N
-Sig stream temp * daily temp - Neg relationship means that as daily temps increase (or 1/temp decreases) the warm streams respond more - i think WANT TO PLOT
-```{r echo=FALSE}
-summary(g.gppBEST3$gam)
-```
-
-Concurvity looks pretty good
-```{r echo=FALSE}
-round(concurvity(g.gppBEST1$gam, full = FALSE)$estimate,3)
-round(concurvity(g.gppBEST2$gam, full = FALSE)$estimate,3)
-round(concurvity(g.gppBEST3$gam, full = FALSE)$estimate,3)
-```
-
-
-```{r echo=FALSE}
-g.gpp.BEST1.gv <- getViz(g.gppBEST1$gam)
-g.gpp.BEST2.gv <- getViz(g.gppBEST2$gam)
-g.gpp.BEST3.gv <- getViz(g.gppBEST3$gam)
+Not bad
+```{r}
+round(concurvity(g.gpp.BEST$gam, full = FALSE)$estimate,3)
 ```
 
 ```{r}
-check(g.gpp.BEST1.gv)
-```
-
-```{r}
-check(g.gpp.BEST2.gv)
-```
-
-```{r}
-check(g.gpp.BEST3.gv)
-```
-
-These aren't too useful for interactions
-```{r echo=FALSE}
-GPPquickPlot1 <- plot(g.gpp.BEST1.gv, allTerms = 1) +
-  l_points(color = "pink") + l_fitLine(linetype = 3) + l_fitContour() + 
-      l_ciLine(colour = 2) + l_ciBar() + l_fitPoints(size = 1, col = 2) + theme_get() + labs(title = NULL)
-
-  print(GPPquickPlot1, pages = 1)
-```
-
-```{r echo=FALSE}
-GPPquickPlot2 <- plot(g.gpp.BEST2.gv, allTerms = 1) +
-  l_points(color = "pink") + l_fitLine(linetype = 3) + l_fitContour() + 
-      l_ciLine(colour = 2) + l_ciBar() + l_fitPoints(size = 1, col = 2) + theme_get() + labs(title = NULL)
-
-  print(GPPquickPlot2, pages = 1)
-```
-
-```{r echo=FALSE}
-GPPquickPlot3 <- plot(g.gpp.BEST3.gv, allTerms = 1) +
-  l_points(color = "pink") + l_fitLine(linetype = 3) + l_fitContour() + 
-      l_ciLine(colour = 2) + l_ciBar() + l_fitPoints(size = 1, col = 2) + theme_get() + labs(title = NULL)
-
-  print(GPPquickPlot3, pages = 1)
+g.gpp.BEST.gv <- getViz(g.gpp.BEST$gam)
+check(g.gpp.BEST.gv)
 ```
 
 
 
-Predict for future ploting
+One last check on the autocorrelation. Just foucsing on 3. Some remaining in S6P, S9A, S9P, S11UA
+
+```{r echo= FALSE, include = FALSE}
+g.gpp.best.acf <- met %>%
+  mutate(g.gppRes = resid(g.gpp.BEST$lme, type = "normalized")) %>%
+  select(streamTreat, g.gppRes) %>%
+  group_by(streamTreat) %>%
+  nest() %>%
+  mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.gppRes) + labs(title = streamTreat)))
+```
+
 ```{r echo= FALSE}
-met$GPPgamPred <- predict.gam(g.gppBEST3$gam, met, type = "response")
-met$GPPgamPred.se <- predict.gam(g.gppBEST3$gam, met, type = "response", se.fit = TRUE)$se.fit
+grid.arrange(grobs = g.gpp.best.acf$acf, ncol = 3)
 ```
 
-Export
+
+```{r echo=FALSE}
+metBestTest <- met %>% 
+  mutate(gppres1 = residuals(g.gpp.BEST$gam, type = "response"),
+         gppPred1 = predict(g.gpp.BEST$gam, type = "response"),
+         gppres2 = residuals(g.gpp.BEST_t$gam, type = "response"),
+         gppPred2 = predict(g.gpp.BEST_t$gam, type = "response"))
+```
+
+
+ Check residuals
+Still some signal with doy. Also early dates with S18-P giving problems
+Not much of a difference between 1 and 2.
+```{r echo=FALSE}
+ggplot(metBestTest, aes(y = gppres1, x = doy, color = stream, shape = treatment)) +
+  geom_point() +
+  facet_grid(stream ~ treatment) 
+```
+
+```{r echo=FALSE}
+ggplot(metBestTest, aes(y = lGPP, x = gppPred1, color = stream, shape = treatment)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1)
+```
+
+
+#### stream temp
+
+
+lGPP ~ invKT.C.StMean * Tanom.iktCs + s(Qres, by = stream) + 
+    s(DOYres, by = stream) + s(LightPerDay.lcg)
+R2 = 0.73
+Obviously NO P effect
+
+
 ```{r}
-readr::write_csv(met, file.path(here::here("01_Data"), "03_PostGPPmet.csv"))
+summary(g.gpp.BEST_t$gam)
+```
+
+looks pretty good
+```{r}
+round(concurvity(g.gpp.BEST_t$gam, full = FALSE)$estimate,3)
 ```
 
 ```{r}
-# save.image(file.path(here::here("04_SavedImages"), "03b_GPPanalysesN_rdat"))
-# load(file.path(here::here("04_SavedImages"), "03b_GPPanalysesN_rdat"))
+g.gpp.BEST_t.gv <- getViz(g.gpp.BEST_t$gam)
+check(g.gpp.BEST_t.gv)
+```
+
+Still some autocorrelation remaining in S6P, S9P, 
+```{r echo= FALSE}
+g.gpp.BEST_t.acf <- met %>% 
+  mutate(g.gppRes = resid(g.gpp.BEST_t$lme, type = "normalized")) %>% 
+  select(streamTreat, g.gppRes) %>% 
+  group_by(streamTreat) %>% 
+  nest() %>% 
+  mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.gppRes) + labs(title = streamTreat)))
+```
+
+```{r echo= FALSE}
+grid.arrange(grobs = g.gpp.BEST_t.acf$acf, ncol = 3)
+```
+
+```{r echo=FALSE}
+ggplot(metBestTest, aes(y = gppres2, x = doy, color = stream, shape = treatment)) +
+  geom_point() +
+  facet_grid(stream ~ treatment) 
+```
+
+
+```{r echo=FALSE}
+ggplot(metBestTest, aes(y = lGPP, x = gppPred2, color = stream, shape = treatment)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1)
+```
+
+
+### save results
+```{r echo = FALSE, include = FALSE}
+ # saveRDS(g.gpp.BEST,
+ #         file = file.path(here::here("05_SavedModels"), "03a_GPP_P_Best.rds"))
+ # saveRDS(g.gpp.BEST_t,
+ #         file = file.path(here::here("05_SavedModels"), "03a_GPP_P_BestTemp.rds"))
+```
+
+
+```{r}
+# save.image(file.path(here::here("04_SavedImages"), "03b_GPPanalysesPonly_rdat"))
 ```
 

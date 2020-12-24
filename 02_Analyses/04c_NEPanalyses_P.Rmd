@@ -349,7 +349,7 @@ readr::write_csv(met, file.path(here::here("01_Data"), "03_PostGPPmet.csv"))
 ```
 
 ```{r}
-save.image(file.path(here::here("04_SavedImages"), "03c_GPPanalysesP_rdat"))
+save.image(file.path(here::here("04_SavedImages"), "04c_NEPanalysesP_rdat"))
 # load(file.path(here::here("04_SavedImages"), "03_GPPanalyses_rdat"))
 ```
 

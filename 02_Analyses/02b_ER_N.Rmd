@@ -143,15 +143,17 @@ subset(g.erDredgeSumF, delta <= 2)
 ```
 
 
-### Best models
-#### Overall
- 
 ```{r}
 g.er.BEST <- gamm(lER ~ treatment * invKT.C.StMean * Tanom.iktCs +
                       s(Qres, by = stream) + s(DOYres),
-                correlation = BestERCor, REML = FALSE, data = met,
+                correlation = BestERCor, REML = TRUE, data = met,
                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
 ```
+
+### Best models
+#### Overall
+ 
+
 
 
 lER ~ treatment * invKT.C.StMean * Tanom.iktCs + s(Qres, by = stream) + 
@@ -214,11 +216,11 @@ ggplot(metBestTest, aes(y = lER, x = erPred1, color = stream, shape = treatment)
 
 ### save results
 ```{r echo = FALSE, include = FALSE}
-saveRDS(g.er.BEST,
-        file = file.path(here::here("05_SavedModels"), "02b_ER_N_Best.rds"))
+# saveRDS(g.er.BEST,
+        # file = file.path(here::here("05_SavedModels"), "02b_ER_N_Best.rds"))
 ```
 
 
 ```{r}
-save.image(file.path(here::here("04_SavedImages"), "02_ERanalysesNonly_rdat"))
+# save.image(file.path(here::here("04_SavedImages"), "02_ERanalysesNonly_rdat"))
 ```
