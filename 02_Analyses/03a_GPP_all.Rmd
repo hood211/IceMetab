@@ -57,85 +57,85 @@ ggplot(met, aes(sample = lGPP, color = stream)) +stat_qq() + stat_qq_line() +
 Preliminary analysis indicated that there was significant autocorrelation. So the first step is to determine the autocorrelation structure. We'll use what is sort of a global model.
 
 ```{r}
-g.gpp.AC_1.0 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 1,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_1.1 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 1,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_1.2 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 1,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_2.0 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 2,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_2.1 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 2,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_2.2 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 2,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_3.0 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 3,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_3.1 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 3,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_3.2 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 3,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_3.3 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 3,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_3.4 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg),
-                correlation = corARMA(p = 3,q = 4, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8), niterEM = 1000)
-
-g.gpp.AC_4.0 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 4,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-# g.gpp.AC_4.1 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+# g.gpp.AC_1.0 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
 #                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-#                 correlation = corARMA(p = 4,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 correlation = corARMA(p = 1,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
 #                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-# g.gpp.AC_4.2 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+# 
+# g.gpp.AC_1.1 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
 #                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-#                 correlation = corARMA(p = 4,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 correlation = corARMA(p = 1,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
 #                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_4.3 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 4,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
-
-g.gpp.AC_4.4 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
-                     s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
-                correlation = corARMA(p = 4,q = 4, form = ~ doy | streamTreat), REML = FALSE, data = met,
-                control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_1.2 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 1,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_2.0 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 2,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_2.1 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 2,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_2.2 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 2,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_3.0 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 3,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_3.1 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 3,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_3.2 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 3,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_3.3 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 3,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_3.4 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg),
+#                 correlation = corARMA(p = 3,q = 4, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8), niterEM = 1000)
+# 
+# g.gpp.AC_4.0 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 4,q = 0, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# # g.gpp.AC_4.1 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+# #                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+# #                 correlation = corARMA(p = 4,q = 1, form = ~ doy | streamTreat), REML = FALSE, data = met,
+# #                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# # g.gpp.AC_4.2 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+# #                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+# #                 correlation = corARMA(p = 4,q = 2, form = ~ doy | streamTreat), REML = FALSE, data = met,
+# #                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_4.3 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 4,q = 3, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
+# 
+# g.gpp.AC_4.4 <- gamm(lGPP ~ treatment + invKT.C.StMean + Tanom.iktCs +   
+#                      s(Qres, by = stream) + s(doy, by = stream) + s(LightPerDay.lcg), 
+#                 correlation = corARMA(p = 4,q = 4, form = ~ doy | streamTreat), REML = FALSE, data = met,
+#                 control = lmeControl(maxIter = 1e8, msMaxIter = 1e8, niterEM = 1000))
 
 ```
 
@@ -269,19 +269,20 @@ round(concurvity(g.gpp.BEST$gam, full = FALSE)$estimate,3)
 ```
 
 ```{r}
-g.gpp.BEST <- getViz(g.gpp.BEST$gam)
-check(g.gpp.BEST)
+g.gpp.BEST.gv <- getViz(g.gpp.BEST$gam)
+check(g.gpp.BEST.gv)
 ```
 
 
 
 One last check on the autocorrelation. Just foucsing on 3. Some remaining in S9A, S9P, S11UA, S18N
-```{r echo= FALSE}
-g.gpp.best.acf <- met %>% 
-  mutate(g.gppRes = resid(g.gpp.BEST$lme, type = "normalized")) %>% 
-  select(streamTreat, g.gppRes) %>% 
-  group_by(streamTreat) %>% 
-  nest() %>% 
+
+```{r echo= FALSE, include = FALSE}
+g.gpp.best.acf <- met %>%
+  mutate(g.gppRes = resid(g.gpp.BEST$lme, type = "normalized")) %>%
+  select(streamTreat, g.gppRes) %>%
+  group_by(streamTreat) %>%
+  nest() %>%
   mutate(acf = map(.x = data, .f = function(d) ggAcf(d$g.gppRes) + labs(title = streamTreat)))
 ```
 
@@ -368,14 +369,14 @@ ggplot(metBestTest, aes(y = lGPP, x = gppPred2, color = stream, shape = treatmen
 
 ### save results
 ```{r echo = FALSE, include = FALSE}
- saveRDS(g.gpp.BEST,
-         file = file.path(here::here("05_SavedModels"), "03a_GPPall_Best.rds"))
- saveRDS(g.gpp.BEST_t,
-         file = file.path(here::here("05_SavedModels"), "03a_GPPall_BestTemp.rds"))
+ # saveRDS(g.gpp.BEST,
+ #         file = file.path(here::here("05_SavedModels"), "03a_GPPall_Best.rds"))
+ # saveRDS(g.gpp.BEST_t,
+ #         file = file.path(here::here("05_SavedModels"), "03a_GPPall_BestTemp.rds"))
 ```
 
 
 ```{r}
-save.image(file.path(here::here("04_SavedImages"), "03a_GPPanalyses_rdat"))
+# save.image(file.path(here::here("04_SavedImages"), "03a_GPPanalyses_rdat"))
 ```
 

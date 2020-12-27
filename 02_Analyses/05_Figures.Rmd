@@ -1,0 +1,396 @@
+---
+title: "Untitled"
+author: "JMH"
+date: "12/26/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(gamm4)
+library(mgcViz)
+library(MuMIn)
+library(forecast)
+library(gridExtra)
+library(tidymv)
+library(ggpubr)
+```
+
+
+```{r}
+load(file.path(here::here("04_SavedImages"), "05_Figures_Rdat"))
+```
+
+
+# LOAD BEST MODELS
+```{r}
+ER_all.b <- readRDS(file = file.path(here::here("05_SavedModels"), "02a_ERall_Best.rds"))
+ER_all.t <- readRDS(file = file.path(here::here("05_SavedModels"), "02a_ERall_BestTemp.rds"))
+ER_N.b <- readRDS(file = file.path(here::here("05_SavedModels"), "02b_ER_N_Best.rds"))
+# ER_N.t <- readRDS(file = file.path(here::here("05_SavedModels"), "")) #Temp was best
+ER_P.b <- readRDS(file = file.path(here::here("05_SavedModels"), "02c_ER_P_Best.rds"))
+ER_P.t <- readRDS(file = file.path(here::here("05_SavedModels"), "02c_ER_P_BestTemp.rds"))
+
+GPP_all.b <- readRDS(file = file.path(here::here("05_SavedModels"), "03a_GPPall_Best.rds"))
+GPP_all.t <- readRDS(file = file.path(here::here("05_SavedModels"), "03a_GPPall_BestTemp.rds"))
+GPP_N.b <- readRDS(file = file.path(here::here("05_SavedModels"), "03b_GPP_N_Best.rds"))
+GPP_N.t <- readRDS(file = file.path(here::here("05_SavedModels"), "03b_GPP_N_BestTemp.rds"))
+GPP_P.b <- readRDS(file = file.path(here::here("05_SavedModels"), "03c_GPP_P_Best.rds"))
+GPP_P.t <- readRDS(file = file.path(here::here("05_SavedModels"), "03c_GPP_P_BestTemp.rds"))
+
+NEP_all.b <- readRDS(file = file.path(here::here("05_SavedModels"), "04a_NEP_all_Best.rds"))
+NEP_all.t <- readRDS(file = file.path(here::here("05_SavedModels"), "04a_NEP_all_BestTemp.rds"))
+NEP_N.b <- readRDS(file = file.path(here::here("05_SavedModels"), "04b_NEP_N_Best.rds"))
+# NEP_N.t <- readRDS(file = file.path(here::here("05_SavedModels"), "")) #Temp was best
+NEP_P.b <- readRDS(file = file.path(here::here("05_SavedModels"), "04c_NEP_P_Best.rds"))
+NEP_P.t <- readRDS(file = file.path(here::here("05_SavedModels"), "04c_NEP_P_BestTemp.rds"))
+```
+
+# Load data 
+```{r message=FALSE, warning=FALSE}
+metAll <- readr::read_csv(file = file.path(here::here("01_Data"),"02_PostERmet.csv")) %>% 
+  mutate(stream = fct_relevel(stream, c("st11U", "st18", "st6", "st9")),
+         treatment = fct_relevel(treatment, c("ambient", "nitrogen", "phosphorus")),
+         Yf = as.factor(Yf),
+         streamTreat = as.factor(streamTreat))
+
+metN <- metAll %>% 
+  filter(treatment == "ambient" | treatment == "nitrogen") %>% 
+  droplevels()
+
+metP <- metAll %>% 
+  filter(treatment == "ambient" | treatment == "phosphorus") %>% 
+  droplevels()
+```
+
+
+# Predict models
+
+## Stream
+```{r}
+QresSet = 0.006583  #grand median
+DOYSet = 8.1 #grand median
+LightSet = -0.04506 #grand median
+StreamSet = "st6"
+P.ER_all.b <- predict_gam(ER_all.b$gam, exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet))
+
+P.ER_P.b <- predict_gam(ER_P.b$gam, exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet))
+
+P.GPP_all.b <- predict_gam(GPP_all.b$gam, exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres)",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              LightPerDay.lcg = LightSet,
+                                              Qres = QresSet,
+                                              DOYres = DOYSet))
+
+P.GPP_N.b <- predict_gam(GPP_N.b$gam, exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres)",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet))
+
+P.GPP_P.b <- predict_gam(GPP_P.b$gam, exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet))
+
+P.NEP_all.b <- predict_gam(NEP_all.b$gam, exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet))
+
+P.NEP_P.b <- predict_gam(NEP_P.b$gam, exclude_terms = c(
+                                            "s(Qres)",
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet))
+```
+
+## Temp
+```{r}
+P.ER_all.t <- predict_gam(ER_all.t$gam,  exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              stream = StreamSet))
+
+P.ER_N.b <- predict_gam(ER_N.b$gam,  exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              stream = StreamSet))
+
+P.ER_P.t <- predict_gam(ER_P.t$gam,  exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              stream = StreamSet))
+
+P.GPP_all.t <- predict_gam(GPP_all.t$gam,  exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres)",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet,
+                                              stream = StreamSet))
+
+P.GPP_N.t <- predict_gam(GPP_N.t$gam,  exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres)",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet,
+                                              stream = StreamSet))
+
+P.GPP_P.t <- predict_gam(GPP_P.t$gam,  exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet,
+                                              stream = StreamSet))
+
+P.NEP_all.t <- predict_gam(NEP_all.t$gam,  exclude_terms = c(
+                                            "s(Qres):streamst11U",
+                                            "s(Qres):streamst18",
+                                            "s(Qres):streamst6",
+                                            "s(Qres):streamst9",
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet,
+                                              stream = StreamSet))
+
+P.NEP_N.b <- predict_gam(NEP_N.b$gam,  exclude_terms = c(
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet,
+                                              stream = StreamSet))
+
+P.NEP_P.t <- predict_gam(NEP_P.t$gam,  exclude_terms = c(
+                                            "s(Qres)",
+                                            "s(DOYres):streamst11U",
+                                            "s(DOYres):streamst18",
+                                            "s(DOYres):streamst6",
+                                            "s(DOYres):streamst9",
+                                            "s(LightPerDay.lcg)"),
+                                            values  = list(
+                                              Qres = QresSet,
+                                              DOYres = DOYSet,
+                                              LightPerDay.lcg = LightSet,
+                                              stream = StreamSet))
+```
+
+
+# Response Figs
+
+## Temp models
+
+### Function
+```{r}
+AnTvDoyTFigFun <- function(ModelPred, Response, RawDat){
+  AnTvDoyTFig <- ggplot() +
+    geom_raster(data = ModelPred, aes(y = -invKT.C.StMean, x = -Tanom.iktCs, fill = fit)) +
+    facet_wrap(vars(treatment)) +
+    scale_fill_distiller(palette = "Spectral") +
+    geom_point(data = RawDat, aes_(y = substitute(-invKT.C.StMean), x = substitute(-Tanom.iktCs), size = substitute(Response)), 
+               position = position_jitter(width = 0.05, height = 0.025), shape = 21, fill = "transparent", alpha= 0.5) +
+    scale_size_binned(n.breaks = 4, nice.breaks = TRUE) +
+    ylab("Mean summer temp (-1 * centered 1/kT)") +
+    xlab("Mean daily temp (-1 * centered 1/kT)")
+  AnTvDoyTFig
+}
+```
+
+
+### Figs
+```{r}
+F1.ER_all_T <- AnTvDoyTFigFun(ModelPred = P.ER_all.t, Response = lER, RawDat = metAll)
+F1.GPP_all_T <- AnTvDoyTFigFun(ModelPred = P.GPP_all.t, Response = lGPP, RawDat = metAll)
+F1.NEP_all_T <- AnTvDoyTFigFun(ModelPred = P.NEP_all.t, Response = NEP, RawDat = metAll)
+```
+
+```{r}
+F1.ER_N_T <- AnTvDoyTFigFun(ModelPred = P.ER_N.b, Response = lER, RawDat = metN)
+F1.GPP_N_T <- AnTvDoyTFigFun(ModelPred = P.GPP_N.t, Response = lGPP, RawDat = metN)
+F1.NEP_N_T <- AnTvDoyTFigFun(ModelPred = P.NEP_N.b, Response = NEP, RawDat = metN)
+```
+
+```{r}
+F1.ER_P_T <- AnTvDoyTFigFun(ModelPred = P.ER_P.t, Response = lER, RawDat = metP)
+F1.GPP_P_T <- AnTvDoyTFigFun(ModelPred = P.GPP_P.t, Response = lGPP, RawDat = metP)
+F1.NEP_P_T <- AnTvDoyTFigFun(ModelPred = P.NEP_P.t, Response = NEP, RawDat = metP)
+```
+
+## Stream models
+
+### Function
+```{r}
+STRvDoyTFigFun <- function(ModelPred, Response, RawDat){
+  # ResponseN <- Response
+  # .e <- environment()
+  STRvDoyTFig <- ggplot() +
+    geom_raster(data = ModelPred, aes(y = stream, x = -Tanom.iktCs, fill = fit)) +
+    facet_wrap(vars(treatment)) +
+    scale_fill_distiller(palette = "Spectral") +
+    # https://ggplot2-book.org/programming.html
+    geom_point(data = RawDat, aes_(y = substitute(stream), x = substitute(-Tanom.iktCs), size = substitute(Response)), 
+               position = position_jitter(width = 0.05, height = 0.025), shape = 21, fill = "transparent", alpha= 0.5) +
+    scale_size_binned(n.breaks = 4, nice.breaks = TRUE) +
+    ylab("Stream") +
+    xlab("Mean daily temp (-1 * centered 1/kT)")
+  STRvDoyTFig
+}
+```
+
+```{r}
+F1.ER_all_B <- STRvDoyTFigFun(ModelPred = P.ER_all.b, Response = lER, RawDat = metAll)
+F1.GPP_all_B <- STRvDoyTFigFun(ModelPred = P.GPP_all.b, Response = lGPP, RawDat = metAll)
+F1.NEP_all_B <- STRvDoyTFigFun(ModelPred = P.NEP_all.b, Response = NEP, RawDat = metAll)
+```
+
+```{r}
+# F1.ER_N_B ----------- BEST MODEL IS TEMP
+F1.GPP_N_B <- STRvDoyTFigFun(ModelPred = P.GPP_N.b, Response = lGPP, RawDat = metN)
+# F1.NEP_N_B  ----------- BEST MODEL IS TEMP
+```
+
+```{r}
+F1.ER_P_B <- STRvDoyTFigFun(ModelPred = P.ER_P.b, Response = lER, RawDat = metP)
+F1.GPP_P_B <- STRvDoyTFigFun(ModelPred = P.GPP_P.b, Response = lGPP, RawDat = metP)
+F1.NEP_P_B <- STRvDoyTFigFun(ModelPred = P.NEP_P.b, Response = NEP, RawDat = metP)
+```
+
+### Print
+Best models
+```{r}
+pdf(file.path(here::here("03_Plots"), "01_Fig1bestModels.pdf"), height = 10, width = 17)
+ggarrange(F1.ER_all_B, F1.GPP_all_B, F1.NEP_all_B,
+          F1.ER_N_T, F1.GPP_N_B, F1.NEP_N_T,
+          F1.ER_P_B, F1.GPP_P_B, F1.NEP_P_B,
+          nrow = 3, ncol = 3)
+dev.off()
+```
+
+Temp models
+```{r}
+pdf(file.path(here::here("03_Plots"), "01_Fig1TempModels.pdf"), height = 10, width = 17)
+ggarrange(F1.ER_all_T, F1.GPP_all_T, F1.NEP_all_T,
+          F1.ER_N_T, F1.GPP_N_T, F1.NEP_N_T,
+          F1.ER_P_T, F1.GPP_P_T, F1.NEP_P_T,
+          nrow = 3, ncol = 3)
+dev.off()
+```
+
+
+
+
+# Save images
+```{r}
+save.image(file.path(here::here("04_SavedImages"), "05_Figures_Rdat"))
+```
+

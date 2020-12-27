@@ -308,3 +308,33 @@ met$GPPgamPred <- predict.gam(g.gppBEST3$gam, met, type = "response")
 met$GPPgamPred.se <- predict.gam(g.gppBEST3$gam, met, type = "response", se.fit = TRUE)$se.fit
 ```
 
+
+#########################################
+# GPP_N
+#########################################
+
+# These aren't too useful for interactions
+```{r echo=FALSE}
+GPPquickPlot1 <- plot(g.gpp.BEST1.gv, allTerms = 1) +
+  l_points(color = "pink") + l_fitLine(linetype = 3) + l_fitContour() + 
+      l_ciLine(colour = 2) + l_ciBar() + l_fitPoints(size = 1, col = 2) + theme_get() + labs(title = NULL)
+
+  print(GPPquickPlot1, pages = 1)
+```
+
+```{r echo=FALSE}
+GPPquickPlot2 <- plot(g.gpp.BEST2.gv, allTerms = 1) +
+  l_points(color = "pink") + l_fitLine(linetype = 3) + l_fitContour() + 
+      l_ciLine(colour = 2) + l_ciBar() + l_fitPoints(size = 1, col = 2) + theme_get() + labs(title = NULL)
+
+  print(GPPquickPlot2, pages = 1)
+```
+
+```{r echo=FALSE}
+GPPquickPlot3 <- plot(g.gpp.BEST3.gv, allTerms = 1) +
+  l_points(color = "pink") + l_fitLine(linetype = 3) + l_fitContour() + 
+      l_ciLine(colour = 2) + l_ciBar() + l_fitPoints(size = 1, col = 2) + theme_get() + labs(title = NULL)
+
+  print(GPPquickPlot3, pages = 1)
+```
+
